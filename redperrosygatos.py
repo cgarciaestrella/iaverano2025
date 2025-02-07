@@ -6,6 +6,9 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import matplotlib.pyplot as plt
 import os
+import tensorflow as tf
+import numpy as np
+from tensorflow.keras.preprocessing import image
 
 data_dir="/home/cris/Descargas/cats_and_dogs_filtered/"
 
@@ -48,8 +51,10 @@ if os.path.exists(dataset_test):
         )
 else:
     dataset_test = None
-
+    
 class_names = dataset_train.class_names
+print(f"Clases detectadas: {class_names}")
+
 plt.figure(figsize=(10,10))
 for images, labels in dataset_train.take(1):
     for i in range(9):
@@ -59,8 +64,15 @@ for images, labels in dataset_train.take(1):
         plt.axis("off")
 plt.show()
 
+data_augmentation = keras.Sequential([
+    layers.RandomFlip("horizontal"),
+    layers.RandomRotation(0.2),
+    layers.RandomZoom(0.2)
+])
+
 # Creación de modelo
 model = keras.Sequential([
+    data_augmentation,
     layers.Rescaling(1./255, input_shape=(180,180,3)),
     layers.Conv2D(32, 3, activation='relu'),
     layers.MaxPooling2D(),
@@ -70,7 +82,8 @@ model = keras.Sequential([
     layers.MaxPooling2D(),
     layers.Flatten(),
     layers.Dense(128, activation='relu'),
-    layers.Dense(2, activation='softmax')
+    # layers.Dense(2, activation='softmax')
+    layers.Dense(len(class_names), activation='softmax')
 ])
 model.compile(
     optimizer='adam',
@@ -95,29 +108,23 @@ if dataset_test:
     test_loss, test_acc = model.evaluate(dataset_test)
     print(f"Precisión en dataset en prueba {test_acc * 100:.2f}%")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
-
-
-
+image_paths = [
+    "/home/cris/Descargas/perro.jpg",
+    "/home/cris/Descargas/gato.jpg",
+    "/home/cris/Descargas/perro1.png"
+]
+plt.figure(figsize=(8,4))
+for i, img_path in enumerate(image_paths):
+    img = image.load_img(img_path, target_size=img_size)
+    img_array = image.img_to_array(img)
+    img_array = tf.expand_dims(img_array, 0)
+    predictions = model.predict(img_array)
+    predicted_class = class_names[np.argmax(predictions)]
+    ax = plt.subplot(1, 3, i+1)
+    plt.imshow(img)
+    plt.title(f"Predicción: {predicted_class}")
+    plt.axis("off")
+plt.show()
 
 
 
