@@ -9,6 +9,7 @@ import os
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras.preprocessing import image
+from collections import Counter ###
 
 data_dir="/home/cris/Descargas/cats_and_dogs_filtered/"
 
@@ -55,6 +56,14 @@ else:
 class_names = dataset_train.class_names
 print(f"Clases detectadas: {class_names}")
 
+# Verificar distribución de clases
+labels_list = [] ###
+for images, labels in dataset_train: ###
+    labels_list.extend(labels.numpy()) ###
+class_counts = Counter(labels_list) ###
+print(f"Distribución de clases en el dataset de entrenamiento: {class_counts}") ###
+
+
 plt.figure(figsize=(10,10))
 for images, labels in dataset_train.take(1):
     for i in range(9):
@@ -67,7 +76,8 @@ plt.show()
 data_augmentation = keras.Sequential([
     layers.RandomFlip("horizontal"),
     layers.RandomRotation(0.2),
-    layers.RandomZoom(0.2)
+    layers.RandomZoom(0.2),
+    layers.RandomBrightness(0.2) ###
 ])
 
 # Creación de modelo
@@ -92,7 +102,7 @@ model.compile(
 )
 
 # Entrenamiento
-epochs = 10
+epochs = 30
 history = model.fit(dataset_train, validation_data = dataset_validation, epochs=epochs)
 
 #Mostrar precisión
@@ -109,9 +119,12 @@ if dataset_test:
     print(f"Precisión en dataset en prueba {test_acc * 100:.2f}%")
 
 image_paths = [
-    "/home/cris/Descargas/perro.jpg",
+    "/home/cris/Descargas/perro1.png",
     "/home/cris/Descargas/gato.jpg",
-    "/home/cris/Descargas/perro1.png"
+    "/home/cris/Descargas/perro.jpg",
+    "/home/cris/Descargas/tigre_9_600.webp",
+    "/home/cris/Descargas/500px-Canis_lupus_265b.jpg"
+  
 ]
 plt.figure(figsize=(8,4))
 for i, img_path in enumerate(image_paths):
@@ -120,35 +133,9 @@ for i, img_path in enumerate(image_paths):
     img_array = tf.expand_dims(img_array, 0)
     predictions = model.predict(img_array)
     predicted_class = class_names[np.argmax(predictions)]
-    ax = plt.subplot(1, 3, i+1)
+    ax = plt.subplot(1, 4, i+1)
     plt.imshow(img)
     plt.title(f"Predicción: {predicted_class}")
     plt.axis("off")
-plt.show()
-
-
-
-
-    
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-    
-    
-    
+plt.show()  
     
