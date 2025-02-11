@@ -102,7 +102,7 @@ model.compile(
 )
 
 # Entrenamiento
-epochs = 30
+epochs = 50
 history = model.fit(dataset_train, validation_data = dataset_validation, epochs=epochs)
 
 #Mostrar precisión
@@ -133,9 +133,9 @@ for i, img_path in enumerate(image_paths):
     img_array = tf.expand_dims(img_array, 0)
     predictions = model.predict(img_array)
     predicted_class = class_names[np.argmax(predictions)]
-    ax = plt.subplot(1, 4, i+1)
+    ax = plt.subplot(1, 5, i+1)
     plt.imshow(img)
-    plt.title(f"Predicción: {predicted_class}")
+    plt.title(f"{predicted_class}")
     plt.axis("off")
 plt.show()  
     
