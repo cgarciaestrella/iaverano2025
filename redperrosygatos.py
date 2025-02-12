@@ -102,7 +102,7 @@ model.compile(
 )
 
 # Entrenamiento
-epochs = 50
+epochs = 1
 history = model.fit(dataset_train, validation_data = dataset_validation, epochs=epochs)
 
 #Mostrar precisión
