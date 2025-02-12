@@ -104,7 +104,7 @@ def predict_fracture(image_path):
     confidence = prediction[0][0]*100 if predicted_class == "Fracturado" else (1-prediction[0][0]*100)
     
     plt.imshow(img)
-    plt.title("Predicción: {predicted_class} \nConfianza: {confidence:.2f}%")
+    plt.title(f"Predicción: {predicted_class} \nConfianza: {confidence:.2f}%")
     plt.axis("off")
     plt.show()
     return predicted_class, confidence     
