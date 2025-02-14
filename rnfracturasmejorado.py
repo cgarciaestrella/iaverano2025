@@ -1,16 +1,14 @@
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers, models, regularizers
 import matplotlib.pyplot as plt
 import os
 import numpy as np
-import pandas as pd
-from tensorflow.keras.preprocessing import image_dataset_from_directory
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from PIL import Image
 
 data_dir = "/home/cris/Descargas/fracturas/"
-clean_data_dir = "/home/cris/Descargas/fracturas_clean/"  
+clean_data_dir = "/home/cris/Descargas/fracturas_clean/"
 
 if not os.path.exists(data_dir):
     raise FileNotFoundError(f"No se encontró el directorio {data_dir}. Verifica la ruta.")
@@ -32,40 +30,32 @@ def clean_and_fix_images(source_dir, target_dir):
 
                 try:
                     with Image.open(source_path) as img:
-                        img = img.convert("RGB")  
-                        img.save(target_path, "JPEG", quality=95)  
+                        img = img.convert("RGB")
+                        img.save(target_path, "JPEG", quality=95)
                 except (IOError, SyntaxError):
                     print(f"❌ Eliminando imagen corrupta: {source_path}")
-                    os.remove(source_path)  
+                    os.remove(source_path)
 
 clean_and_fix_images(data_dir, clean_data_dir)
 
-def load_dataset(directory):
-    try:
-        dataset = image_dataset_from_directory(
-            directory,
-            image_size=img_size,
-            batch_size=batch_size,
-            label_mode="binary",  
-            shuffle=True,
-            seed=42
-        )
-        return dataset
-    except Exception as e:
-        print(f"Error al cargar imágenes en {directory}: {e}")
-        return None
+def load_dataset(directory, subset):
+    subset_path = os.path.join(directory, subset)  
+    return keras.preprocessing.image_dataset_from_directory(
+        subset_path,
+        seed=42,
+        image_size=img_size,
+        batch_size=batch_size,
+        label_mode="binary"
+    )
 
-train_dataset = load_dataset(os.path.join(clean_data_dir, "train"))
-test_dataset = load_dataset(os.path.join(clean_data_dir, "test"))
-validation_dataset = load_dataset(os.path.join(clean_data_dir, "val"))
-
-if not train_dataset or not validation_dataset:
-    raise RuntimeError("Error al cargar datasets. Verifica que todas las imágenes sean válidas.")
+train_dataset = load_dataset(clean_data_dir, "train")
+validation_dataset = load_dataset(clean_data_dir, "val")
 
 data_augmentation = keras.Sequential([
     layers.RandomFlip("horizontal"),
-    layers.RandomRotation(0.2),
-    layers.RandomZoom(0.2),
+    layers.RandomRotation(0.3),
+    layers.RandomZoom(0.3),
+    layers.RandomContrast(0.3),
 ])
 
 base_model = keras.applications.MobileNetV2(
@@ -80,19 +70,28 @@ model = keras.Sequential([
     layers.Rescaling(1./255),
     base_model,
     layers.GlobalAveragePooling2D(),
-    layers.Dense(128, activation='relu'),
-    layers.Dropout(0.3),
+    layers.Dense(128, activation='relu', kernel_regularizer=regularizers.l2(0.01)),  
+    layers.Dropout(0.5),
     layers.Dense(1, activation='sigmoid')  
 ])
 
+lr_schedule = keras.callbacks.LearningRateScheduler(lambda epoch: 1e-4 * 10**(-epoch / 20))
+
+early_stopping = keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
+
 model.compile(
-    optimizer='adam',
+    optimizer=keras.optimizers.Adam(learning_rate=0.0001),
     loss='binary_crossentropy',
     metrics=['accuracy']
 )
 
-epochs = 20
-history = model.fit(train_dataset, validation_data=validation_dataset, epochs=epochs)
+epochs = 30
+history = model.fit(
+    train_dataset,
+    validation_data=validation_dataset,
+    epochs=epochs,
+    callbacks=[early_stopping, lr_schedule]
+)
 
 plt.plot(history.history['accuracy'], label='Precisión de entrenamiento')
 plt.plot(history.history['val_accuracy'], label='Precisión de validación')
@@ -101,14 +100,31 @@ plt.ylabel('Precisión')
 plt.legend()
 plt.show()
 
-def predict_fracture(image_path):
-    img = load_img(image_path, target_size=img_size)  
-    img_array = img_to_array(img) / 255.0  
-    img_array = np.expand_dims(img_array, axis=0)  
+base_model.trainable = True
+for layer in base_model.layers[:-30]:  
+    layer.trainable = False  
 
-    prediction = model.predict(img_array)  
+model.compile(
+    optimizer=keras.optimizers.Adam(learning_rate=1e-5),
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
+
+history = model.fit(
+    train_dataset,
+    validation_data=validation_dataset,
+    epochs=15,
+    callbacks=[early_stopping]
+)
+
+def predict_fracture(image_path):
+    img = load_img(image_path, target_size=img_size)
+    img_array = img_to_array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+
+    prediction = model.predict(img_array)
     predicted_class = "Fracturado" if prediction[0][0] > 0.5 else "No fracturado"
-    confidence = prediction[0][0] * 100 if predicted_class == "Fracturado" else (1 - prediction[0][0]) * 100
+    confidence = max(prediction[0][0], 1 - prediction[0][0]) * 100
 
     plt.imshow(img)
     plt.title(f"Predicción: {predicted_class} \nConfianza: {confidence:.2f}%")
@@ -127,8 +143,8 @@ def predict_fracture_directory(directory_path):
         if filename.lower().endswith(('.png', '.jpg', '.jpeg')):  
             try:
                 with Image.open(file_path) as img:
-                    img.verify()  
-                predict_fracture(file_path)  
+                    img.verify()
+                predict_fracture(file_path)
             except Exception as e:
                 print(f"Imagen dañada, no se pudo procesar: {file_path}")
 
