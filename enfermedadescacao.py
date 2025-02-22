@@ -28,7 +28,7 @@ train_generator = datagen.flow_from_directory(
     train_dir,
     target_size=(224, 224),
     batch_size=64,
-    class_mode='categorical',
+    class_mode='sparse',
     subset='training'
 )
 
@@ -36,31 +36,32 @@ val_generator = datagen.flow_from_directory(
     train_dir,
     target_size=(224, 224),
     batch_size=64,
-    class_mode='categorical',
+    class_mode='sparse',
     subset='validation'
 )
 
 base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
-base_model.trainable = True 
+base_model.trainable = True  
 
-for layer in base_model.layers[:-20]:  
+for layer in base_model.layers[:-20]: 
     layer.trainable = False
 
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 x = BatchNormalization()(x)  
 x = Dense(512, activation='relu')(x)
-x = Dropout(0.4)(x)  
+x = Dropout(0.4)(x) 
 output_layer = Dense(3, activation='softmax')
 
 model = Model(inputs=base_model.input, outputs=output_layer(x))
 
+# Callbacks para optimización
 early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 lr_reduction = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6)
 
 model.compile(
     optimizer=Adam(learning_rate=0.0001),
-    loss='categorical_crossentropy',
+    loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
@@ -79,14 +80,16 @@ test_generator = ImageDataGenerator(rescale=1./255).flow_from_directory(
     base_dir,
     target_size=(224, 224),
     batch_size=64,
-    class_mode='categorical'
+    class_mode='sparse'
 )
 
 eval_results = model.evaluate(test_generator)
 print(f"Pérdida: {eval_results[0]}, Precisión: {eval_results[1]}")
 
+
 plt.figure(figsize=(12, 5))
 
+# Pérdida
 plt.subplot(1, 2, 1)
 plt.plot(history.history['loss'], label='Entrenamiento')
 plt.plot(history.history['val_loss'], label='Validación')
@@ -95,6 +98,7 @@ plt.ylabel('Pérdida')
 plt.legend()
 plt.title('Evolución de la pérdida')
 
+# Precisión
 plt.subplot(1, 2, 2)
 plt.plot(history.history['accuracy'], label='Entrenamiento')
 plt.plot(history.history['val_accuracy'], label='Validación')
